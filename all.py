@@ -1,4 +1,4 @@
-#Algoritmo_de_AI_VHM
+#%%Algoritmo_de_AI_VHM
 """
 Created on Thu Aug 26 11:31:03 2021
 
@@ -14,18 +14,57 @@ from sklearn.model_selection import train_test_split # para partir las variables
 from sklearn.neighbors import KNeighborsClassifier # modelo para entrenar
 #%% funciones
 def split(X): #Obtener los valores del array
+    """[adquiere los valores dentro de un array]
 
+    Args:
+        X ([list): [vector con los valores a encontrar]
+
+    Returns:
+        [list]: [valores sin repetir]
+    """
     vals = []
     for i in X:
         if i not in vals:
             vals.append(i)
     return vals
-#%% objetos
 
+
+def change_date(db,New_date): 
+    
+    """[cambia la fecha lei por la base de datos por una nueva para poder realizar la prediccion]
+
+    Returns:
+        [dataframe]: [arreglo cambiado]
+    """
+    
+    list_date = list()
+    list_date.append(New_date)
+    
+    amoung = len(db["fecha_mant"])
+    
+    list_date = amoung*list_date
+    
+    db["fecha_mant"] = list_date
+    
+    obj_change_time = DateTime(db)
+    db = obj_change_time.datetime2days()
+    
+    return db["tiempo"]
+#%% objetos
+#%%
 #objeto para importar la informacion desde la base de datos
 class admin():    
     #incializar variables
-    def __init__(self,user,passwd,name_database,host):        
+    def __init__(self,user,passwd,name_database,host):   
+        """[inicializacion de objeto que se conecta con la base de datos]
+
+        Args:
+            user ([string]): [usuario registrado en la base de datos]
+            passwd ([string]): [contraseña relacionada con el usuario]
+            name_database ([string]): [nombre de la base de datos]
+            host ([string]): [puerto al que se conecta]
+        """
+             
         self.user = user
         self.passwd = passwd
         self.name_database = name_database
@@ -33,7 +72,13 @@ class admin():
         
     #conectar con la base de datos
     
-    def conect(self): # conectarse con la base de datos    
+    def conect(self): # conectarse con la base de datos   
+        """[conectarse con la base de datos]
+
+        Returns:
+            [database]: [devuelva la base de datos]
+        """
+         
         self.db = sql.connect(
                 user = self.user,
                 passwd = self.passwd,
@@ -44,6 +89,11 @@ class admin():
     
    # realiza la consulta 
     def query(self,query):
+        """[crea el cursor y ejecuta la consulta enviada]
+
+        Returns:
+            [list of tuples]: [la informacion obtenida de la consulta]
+        """
         
         self.c = self.db.cursor()
         self.c.execute(query)
@@ -51,6 +101,17 @@ class admin():
         return self.c.fetchall()
     
     def create_table(self,table_name,variables_names,variables_types):
+        """[crea una tabla en la base de datos]
+
+        Args:
+            table_name ([string]): [nombre de la tabla a crear]
+            variables_names ([list]): [nombre de las variables de la tabla]
+            variables_types ([list]): [nombre de los tipos de variables]
+
+        Returns:
+            [boolean]: [un estado si la tabla ya existia]
+        """
+        
         
         if(self.table_exist(table_name)  == True):
             
@@ -80,6 +141,14 @@ class admin():
             return False
                 
     def table_exist(self,name):
+        """[revisa si la tabla existe en la base de datos]
+
+        Args:
+            name ([string]): [nombre de la tabla a consultar]
+
+        Returns:
+            [boolean]: [estado de la consulta]
+        """
         
         self.c.execute("SHOW TABLES")
         
@@ -91,23 +160,39 @@ class admin():
             return False
         
     def add_foreigh_key(self,tablep,tables):
-         query = "ALTER TABLE " + tables
-         ID0 = "(" + tablep + "_id" + tablep + ")" 
-         ID1 = "(id" + tablep+ ")"
+        """[agrega una llave foranea con respecto a las id de las tablas
+
+        Args:
+            tablep ([string]): [nombre de la tabla principal]
+            tables ([type]): [nombre  de la tabla secundaria]
+        """
+        
+        query = "ALTER TABLE " + tables
          
-         query += " ADD FOREIGN KEY " + ID0 + " REFERENCES " + tablep + ID1 
-        
-         print(query)
-        
-         self.c.execute(query)
+        ID0 = "(" + tablep + "_id" + tablep + ")" 
+        ID1 = "(id" + tablep+ ")"
+         
+        query += " ADD FOREIGN KEY " + ID0 + " REFERENCES " + tablep + ID1 
+         
+        self.c.execute(query)
          
     def drop_table(self,table_name):
+        """[elimina una tabla]
+
+        Args:
+            table_name ([string]): [nombre de la tabla a eliminar]
+        """
         
         query = "DROP TABLE IF EXISTS {}".format(table_name)
         self.c.execute(query)
         
     def drop_column(self,table_name,column_name):
-        
+        """[elimina una columna de una tabla]
+
+        Args:
+            table_name ([string]): [nombre de la tabla]
+            column_name ([string]): [nombre de la column]
+        """
         query = "ALTER TABLE {} DROP COLUMN {}".format(table_name, column_name)
         
         self.c.execute(query)
@@ -115,11 +200,26 @@ class admin():
         print("column has been deleted")
         
     def add_column(self,table_name,column_name,types):
+        """[agrega columna a una tabla]
+
+        Args:
+            table_name ([string]): [nombre de la tabla]
+            column_name ([string]): [nombre de la nueva columna]
+            types ([string]): [nombre del tipo de dato de la columna]
+        """
         
         query = "ALTER TABLE {} ADD {} {}".format(table_name,column_name,types)
         self.c.execute(query)
         
-    def is_empty(self,table_name,val):
+    def is_empty(self,table_name):
+        """[revisa si una tabla se encuentra vacia]
+
+        Args:
+            table_name ([string]): [nombre de la columna]
+
+        Returns:
+            [int]: [numero de registro dentro de la tabla]
+        """
         
         query = "SELECT * FROM {}".format(table_name)
         
@@ -130,7 +230,15 @@ class admin():
     
     
     def add_info(self,table_name,columns_name,vals,value):
-                
+        """[agrega informacion dentro de la tabla]
+
+        Args:
+            table_name ([string]): [nombre de la tabla]
+            columns_name ([list]]): [nombre de la columna a modificar o insertar]
+            vals ([list]): [valores a ingresar]
+            value ([boolean]): [revisar si la tabla apenas se creo o ya lo habia hecho]
+        """
+    
         if value ==   True:
             
             query = "INSERT INTO {} ".format(table_name)
@@ -162,22 +270,15 @@ class admin():
                 
                 update_info = [col,val]
                 self.update(table_name,update_info,check_info)
-        
-                
-    def check_query(self,table_name,column_name,val):
-        
-        query = "SELECT * FROM {} WHERE {}.{} = {}".format(table_name, table_name, column_name,val)
-        
-        self.c = self.db.cursor(buffered = True)
-        
-        
-        self.c.execute(query)
-        
-        return self.c.rowcount
-    
+            
     def update(self,table_name, update_info, check_info):#funcion que actualiza los valores
-        
-        print("entro")
+        """[actualiza los datos de la tabla]
+
+        Args:
+            table_name ([string]): [nombre de la tabla]
+            update_info ([list]): [informacion para actualizar]
+            check_info ([list]): [informacion de condicion donde actualizar los datos]
+        """
         if(isinstance(update_info[1], str)):
         
             query = "UPDATE {} SET {} = '{}' WHERE {} = {}".format(table_name,update_info[0],update_info[1],check_info[0],check_info[1])
@@ -190,12 +291,21 @@ class admin():
 class organizer():
     
     def __init__(self,result,columns):
-        
+        """[Organizar la base de datos]
+
+        Args:
+            result ([dataframe]): [description]
+            columns ([list]): [description]
+        """
         self.messy = result
         self.columns = columns
     
     def sort(self):
-        
+        """[ordenar los datos]
+
+        Returns:
+            [dataframe]: [datos ordenados]
+        """
         #crea un dicticcionario
         sort = {}
         
@@ -214,11 +324,21 @@ class subdivider():#subdivide los datos ordenados en categorias para trabajar in
     
     # info son los datos completos y X son los valores a subdividir
     def __init__(self,info,col):
+        """[inicializar el objeto]
+
+        Args:
+            info ([dataframe]): [base de datos modificada]
+            col ([type]): [description]
+        """
         self.info = info
         self.vals = split(col)
     
     def Subdivide(self):
-        
+        """[subdividir los datos obtenidos por tipo de equipo]
+
+        Returns:
+            [list]: [datos segmentados]
+        """
         sub = {}
         
         for i in self.vals:
@@ -231,11 +351,18 @@ class subdivider():#subdivide los datos ordenados en categorias para trabajar in
 class Encoder():
     
     def __init__(self,db):
+        """[inicialiar el objeto]
+
+        Args:
+            db ([dataframe]): [base de datos consultada con los valores cualitativas]
+        """
         self.db = db
         self.check()
 
     
     def check(self):
+        """[estandarizar los valores de las observaciones para obtener demasiadas etiquetas y convertirlo en un problema binario]
+        """
         
         self.y = self.db["observaciones"].to_numpy()
         
@@ -257,6 +384,11 @@ class Encoder():
                               
         
     def encoder(self,names):
+        """[convertir las variables cualitativas a cuantativas]
+
+        Args:
+            names ([list]): [nombre de la columna para aplicar encoder]
+        """
         # realiza el encoder de varias columnas a la vez
     
     # diccionario que contedra los encoder
@@ -275,10 +407,19 @@ class Encoder():
 class DateTime():
 
     def __init__(self,db):
+        """[inicializar el objeto]
+
+        Args:
+            db ([dataframe]): [datos consultados de la base de datos]
+        """
         self.Xo = db
         
     def datetime2days(self):
-        
+        """[convertir las fechas de registro y de mantenimiento en dias]
+
+        Returns:
+            [datetime]: [dias entre las dos fechas]
+        """
         label_tiempo = ["fecha_registro","fecha_mant"]
         
         for i in label_tiempo:
@@ -294,38 +435,42 @@ class DateTime():
 class Model():
     
     def __init__(self,model,X,y):
+        """[objeto que entrena los modelos de machine learning]
+
+        Args:
+            model ([sklearn objet]): [modelo que se pretende implementar]
+            X ([dataframe]): [matrix de caracteristicas]
+            y ([dataframe]): [vector de etiquetas]
+        """
         
         self.my_model = model
         
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split( X, y.ravel(), test_size=0.33, random_state=42)
         
     def fit(self):
+        """[entrenamiento del modelo]
+        """
         self.my_model.fit(self.X_train,self.y_train)
     
     def score(self):
+        """[evaluar el desempeño del modelo]
+
+        Returns:
+            [float]: [desempeño del modelo]
+        """
         return self.my_model.score(self.X_test,self.y_test)
     
     def predict(self,X):
-        return self.my_model.predict(X)
- 
-#%% Funciones
+        """[evaluar modelo prediciendo una muestra]
 
-def change_date(db,New_date): 
-    
-    list_date = list()
-    list_date.append(New_date)
-    
-    amoung = len(db["fecha_mant"])
-    
-    list_date = amoung*list_date
-    
-    db["fecha_mant"] = list_date
-    
-    obj_change_time = DateTime(db)
-    db = obj_change_time.datetime2days()
-    
-    return db["tiempo"]
-        
+        Args:
+            X ([dataframe]): [matriz de caracterisitcas]
+
+        Returns:
+            [int]: [valor predecido entre las etiquetas]
+        """
+        return self.my_model.predict(X)
+         
 #%%       
 user = "axsel"
 passwd = "17060327A"
