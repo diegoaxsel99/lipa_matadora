@@ -72,10 +72,12 @@ class admin():
             self.c.execute(my_query)
             
             print("table has been created")
+            return True
             
         else:
             
             print ("table already exist")
+            return False
                 
     def table_exist(self,name):
         
@@ -127,38 +129,62 @@ class admin():
         return self.c.rowcount
     
     
-    def add_info(self,table_name,columns_name,vals,check_info):
-        
-        
-        query = "INSERT INTO {} ".format(table_name)
-        
-        f = "("
-        s = "("
-        for i in columns_name:
-            f += i + ", "
-            s += "%s, "
+    def add_info(self,table_name,columns_name,vals,value):
+                
+        if value ==   True:
             
-        f = f[:len(f) - 2]
-        f += ")"
-        
-        s = s[:len(s) - 2]
-        s += ")"
-        
-        query += f + " VALUES " + s
-        
-        val = (vals[0],vals[1],int(vals[2]))
-        self.c.execute(query,val)
-        
-        self.db.commit()
+            query = "INSERT INTO {} ".format(table_name)
             
+            f = "("
+            s = "("
+            for i in columns_name:
+                f += i + ", "
+                s += "%s, "
+                
+            f = f[:len(f) - 2]
+            f += ")"
+            
+            s = s[:len(s) - 2]
+            s += ")"
+            
+            query += f + " VALUES " + s
+            
+            val = (vals[0],vals[1],int(vals[2]))
+            self.c.execute(query,val)
+            
+            self.db.commit()
+            
+        else:
+            
+            check_info = [columns_name[2],vals[2]]
+            
+            for col,val in zip(columns_name,vals):
+                
+                update_info = [col,val]
+                self.update(table_name,update_info,check_info)
+        
+                
     def check_query(self,table_name,column_name,val):
         
-        query = "SELECT {} FROM {} WHERE {}".format(column_name, table_name, val)
+        query = "SELECT * FROM {} WHERE {}.{} = {}".format(table_name, table_name, column_name,val)
+        
+        self.c = self.db.cursor(buffered = True)
+        
         
         self.c.execute(query)
         
         return self.c.rowcount
+    
+    def update(self,table_name, update_info, check_info):#funcion que actualiza los valores
         
+        print("entro")
+        if(isinstance(update_info[1], str)):
+        
+            query = "UPDATE {} SET {} = '{}' WHERE {} = {}".format(table_name,update_info[0],update_info[1],check_info[0],check_info[1])
+            
+            self.c = self.db.cursor(buffered = True)
+            self.c.execute(query)
+            self.db.commit()
 
 #organizador con respecto a lo enviado
 class organizer():
@@ -376,7 +402,7 @@ predict_data = {}
 names = ["modelo","area","nombre_sede","marca"]
 scores = []
 
-new_date = "2022-02-01"
+new_date = "2023-02-01"
 
 columns_names = sub_data.keys()
 
@@ -419,14 +445,15 @@ table_name = "predicciones"
 variable_name = ["predición","fecha","equipos_idequipos"]
 types = ["VARCHAR (255)", "DATE","INT"]
 
-Admin.create_table(table_name, variable_name, types)  
+exists = Admin.create_table(table_name, variable_name, types)  
+if(exists):
+    Admin.add_foreigh_key("equipos",table_name)
 
 "insertando o actualizando los datos en la tabla"
+
 for i in new_table:
     
-    # este vector es para tomar la decision entre insertar la informacion o actualizarla
-    check_info = ["equipos_idequipos",i[2]]
-    
-    Admin.add_info(table_name,variable_name,i,check_info)
+    # este vector es para tomar la decision entre insertar la informacion o actualizarla    
+    Admin.add_info(table_name,variable_name,i,exists)
 #%%
 
