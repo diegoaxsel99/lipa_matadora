@@ -12,44 +12,10 @@ import pandas as pd # manejo de dataframes
 from sklearn.preprocessing import OrdinalEncoder# hacer encoder sobre las variables string
 from sklearn.model_selection import train_test_split # para partir las variables
 from sklearn.neighbors import KNeighborsClassifier # modelo para entrenar
-#%% funciones
-def split(X): #Obtener los valores del array
-    """[adquiere los valores dentro de un array]
-
-    Args:
-        X ([list): [vector con los valores a encontrar]
-
-    Returns:
-        [list]: [valores sin repetir]
-    """
-    vals = []
-    for i in X:
-        if i not in vals:
-            vals.append(i)
-    return vals
-
-
-def change_date(db,New_date): 
-    
-    """[cambia la fecha lei por la base de datos por una nueva para poder realizar la prediccion]
-
-    Returns:
-        [dataframe]: [arreglo cambiado]
-    """
-    
-    list_date = list()
-    list_date.append(New_date)
-    
-    amoung = len(db["fecha_mant"])
-    
-    list_date = amoung*list_date
-    
-    db["fecha_mant"] = list_date
-    
-    obj_change_time = DateTime(db)
-    db = obj_change_time.datetime2days()
-    
-    return db["tiempo"]
+import json # importar archivos json
+from progress.bar import Bar #animacion de barra de carga
+import numpy as np # manejo de herramientas matematicas y control de arrays
+from datetime import datetime
 #%% objetos
 #%%
 #objeto para importar la informacion desde la base de datos
@@ -333,7 +299,7 @@ class subdivider():#subdivide los datos ordenados en categorias para trabajar in
         self.info = info
         self.vals = split(col)
     
-    def Subdivide(self):
+    def Subdivide(self,tam):
         """[subdividir los datos obtenidos por tipo de equipo]
 
         Returns:
@@ -342,7 +308,7 @@ class subdivider():#subdivide los datos ordenados en categorias para trabajar in
         sub = {}
         
         for i in self.vals:
-            if self.info[self.info["categoria"] == i].shape[0] > 40:
+            if self.info[self.info["categoria"] == i].shape[0] > tam:
                 
                 sub[i] = (self.info[self.info["categoria"] == i].drop(["categoria"], axis = 1))     
         
@@ -364,26 +330,25 @@ class Encoder():
         """[estandarizar los valores de las observaciones para obtener demasiadas etiquetas y convertirlo en un problema binario]
         """
         
-        self.y = self.db["observaciones"].to_numpy()
+        y = self.db["observaciones"].to_numpy()
         
         #palabras que siguinifica que esta funcionando correctamente
         words = ["correctamente","Correctamente","correcto","buenas condiciones"]
         
-        for jj,i in enumerate(self.y):
+        for jj,i in enumerate(y):
             for j in words:
                 if i.find(j) > 0:
-                    self.y[jj] = "ok"
+                    y[jj] = "ok"
                     break
                 else: 
-                    self.y[jj] = "no ok"
+                    y[jj] = "no ok"
         
         #realizar encoder y guardar los valores
-        enc = OrdinalEncoder()
-        self.y = {"enc":enc, 
-                  "values":enc.fit_transform(self.y.reshape(-1,1))}
-                              
+        self.enc_y = OrdinalEncoder()
         
-    def encoder(self,names):
+        self.enc_y.fit(y.reshape(-1,1))
+                          
+    def encoder_X(self,names):
         """[convertir las variables cualitativas a cuantativas]
 
         Args:
@@ -394,15 +359,17 @@ class Encoder():
     # diccionario que contedra los encoder
         dic = {}
         for i in names:
-            enc = OrdinalEncoder()
-            self.db[i] = enc.fit_transform(self.db[i].to_numpy().reshape(-1,1))    
-            dic[i] = enc
-        
-        #metemos todo en un diccionario
-        data_enc = {"enc":dic,
-                   "values":self.db.drop(["observaciones"], axis = 1)}    
             
-        return  {"X": data_enc, "y": self.y}
+            X = np.copy(self.db[i].to_numpy().reshape(-1,1))
+            
+            enc = OrdinalEncoder()
+            enc.fit(X)   
+            dic[i] = enc
+            
+        return  dic
+    
+    def encoder_y(self):
+        return self.enc_y
 #objeto que transforma las varables de fechas a dias           
 class DateTime():
 
@@ -470,135 +437,278 @@ class Model():
             [int]: [valor predecido entre las etiquetas]
         """
         return self.my_model.predict(X)
+#%% funciones
+def split(X): #Obtener los valores del array
+    """[adquiere los valores dentro de un array]
+
+    Args:
+        X ([list): [vector con los valores a encontrar]
+
+    Returns:
+        [list]: [valores sin repetir]
+    """
+    vals = []
+    for i in X:
+        if i not in vals:
+            vals.append(i)
+    return vals
+
+def change_date(db, New_date): 
+    
+    """[cambia la fecha lei por la base de datos por una nueva para poder realizar la prediccion]
+
+    Returns:
+        [dataframe]: [arreglo cambiado]
+    """
+        
+    fechas = db["fecha_registro"]
+    
+    new_time = datetime.strptime(New_date,"%Y-%m-%d")
+    
+    date_list = []
+    
+    for i in fechas:
+        date_list.append((new_time - i).days)
+    
+    return date_list
+
+class my_main():
+    
+    def __init__(self):
+        
+        f1 = open("input.json")
+        self.data1 = json.load(f1)
+        
+        f2 = open("predict.json")
+        self.data2 = json.load(f2)
+        
+        # consulta que se realiza
+        self.my_query = """SELECT 
+
+        equi.idequipos,
+        modelo.modelo,
+        areas.area,
+        marca.marca,
+        sede.nombre_sede,
+        cat_equi.categoria,
+        equi.fecha_registro, 
+        mp.fecha_mant, 
+        mp.observaciones
+
+        FROM 
+        equipos AS equi, 
+        mant_prevent AS mp,
+        modelo,
+        areas_servicios AS areas,
+        categoria_equipos AS cat_equi,
+        sede_empresa AS sede,
+        marca
+
+        WHERE 
+        equi.idequipos = mp.equipos_idequipos 
+        AND 
+        equi.modelo_idmodelo = modelo.idmodelo
+        AND
+        equi.areas_servicios_idareas_servicios = areas.idareas_servicios
+        AND
+        equi.categoria_equipos_idcategoria_equipos = cat_equi.idcategoria_equipos
+        AND
+        equi.sede_empresa_idsede_empresa = sede.idsede_empresa
+        AND
+        modelo.marca_idmarca = marca.idmarca"""
+                
+        self.columns = ["id",
+                "modelo",
+                "area",
+                "marca",
+                "nombre_sede",
+                "categoria",
+                "fecha_registro",
+                "fecha_mant",
+                "observaciones"]
+        
+        self.names = ["modelo","area","nombre_sede","marca"]
+                
+        self.train_model()
+        
+        if self.data2["id"] ==  "all" :
+            self.predict_and_go()
+        else:
+            self.predict_few()
+
+    def train_model(self):
+        #lectura de los datos que se encuentran en json
+        self.obj_mod = {}
+        
+        #conectando con la base de datos
+        self.Admin = admin(self.data1["user"],self.data1["passwd"] ,self.data1["database"],self.data1["host"])
+        self.Admin.conect()
+
+        #realiza la consulta
+        result = self.Admin.query(self.my_query)
+        
+        #tamaño minino de muestras
+        tam = 40
+        
+        self.get_matrix(result,tam, training = True)
+        
+        columns_names = self.sub_data.keys()
+        
+        #definir la barra de descarga
+        bar = Bar('training model:', max = len(columns_names))
+        
+        for i in columns_names:
+            #objeto entrenador de modelo
+
+            knn = KNeighborsClassifier(n_neighbors=3)
+            self.obj_mod[i] = Model(knn,self.enc_X_data[i], self.enc_y_data[i]["label"])
+            self.obj_mod[i].fit()
+            bar.next()
+        
+        bar.finish()
+             
+    def predict_and_go(self):
+        
+        # los encoders ya se encuentran construidos
+        predict_data = {}
+        col_names = self.enc_X_data.keys()
          
-#%%       
-user = "axsel"
-passwd = "17060327A"
-database = "axsel_test"
-host = "localhost"
-
-#conectando con la base de datos
-Admin = admin(user,passwd ,database,host)
-Admin.conect()
-
-# consulta que se realiza
-my_query = """SELECT 
-
-equi.idequipos,
-modelo.modelo,
-areas.area,
-marca.marca,
-sede.nombre_sede,
-cat_equi.categoria,
-equi.fecha_registro, 
-mp.fecha_mant, 
-mp.observaciones
-
-FROM 
-equipos AS equi, 
-mant_prevent AS mp,
-modelo,
-areas_servicios AS areas,
-categoria_equipos AS cat_equi,
-sede_empresa AS sede,
-marca
-
-WHERE 
-equi.idequipos = mp.equipos_idequipos 
-AND 
-equi.modelo_idmodelo = modelo.idmodelo
-AND
-equi.areas_servicios_idareas_servicios = areas.idareas_servicios
-AND
-equi.categoria_equipos_idcategoria_equipos = cat_equi.idcategoria_equipos
-AND
-equi.sede_empresa_idsede_empresa = sede.idsede_empresa
-AND
-modelo.marca_idmarca = marca.idmarca"""
-
-#realiza la consulta
-result = Admin.query(my_query)
-
-#ordenar los datos obtenidos
-columns = ["id",
-           "modelo",
-           "area",
-           "marca",
-           "nombre_sede",
-           "categoria",
-           "fecha_registro",
-           "fecha_mant",
-           "observaciones"]
-
-#definimos objeto para ordenar
-obj_org = organizer(result,columns)
-sort_data = obj_org.sort()
-
-#subdivimos la muestra
-obj_sub = subdivider(sort_data, sort_data["categoria"])
-sub_data = obj_sub.Subdivide()
-
-#correcion de las fechas a dias,encoder sobre las variables, entrenamiento de modelo seleccionado
-days_data = {}
-enc_data = {}
-predict_data = {}
-
-#columna a realizar encoder 
-names = ["modelo","area","nombre_sede","marca"]
-scores = []
-
-new_date = "2023-02-01"
-
-columns_names = sub_data.keys()
-
-for i in columns_names:
-    
-    # objeto de tiempo
-    obj_time = DateTime(sub_data[i])
-    days_data[i] = obj_time.datetime2days()
-    
-    #objeto de encoder
-    obj_enc = Encoder(days_data[i])
-    enc_data[i] = Encoder.encoder(obj_enc,names)
-    
-    #objeto entrenador de modelo
-    
-    knn = KNeighborsClassifier(n_neighbors=3)
-    obj_mod = Model(knn,enc_data[i]["X"]["values"], enc_data[i]["y"]["values"])
-    obj_mod.fit()
-    
-    enc_data[i]["X"]["values"]["tiempo"] = change_date(sub_data[i], new_date)
-    
-    predict_data[i]  = obj_mod.predict(enc_data[i]["X"]["values"])
-    predict_data[i] = enc_data[i]["y"]["enc"].inverse_transform(predict_data[i].reshape(-1,1))
-    
-    scores.append(obj_mod.score())
-
-#generar la tabla de prediciones
-
-new_table = []
-
-for i in columns_names:
-    for j in range(len(sub_data[i])):
         
-        new_table.append((predict_data[i][j][0],new_date,int(sub_data[i]["id"].to_numpy()[j])))
+        bar = Bar('predicting in date {}:'.format(self.data2["new_date"]), max = len(col_names))
         
-#%%
+        for i in col_names:
+            
+            self.enc_X_data[i] = self.enc_X_data[i].drop_duplicates(subset = ["id"])
+            self.sub_data[i] = self.sub_data[i].drop_duplicates(subset = ["id"])
+            
+            self.enc_X_data[i]["tiempo"] = change_date(self.sub_data[i], self.data2["new_date"])
+            
+            predict_data[i]  = self.obj_mod[i].predict(self.enc_X_data[i])
+                        
+            encoder = self.enc_y[i]
+            dato = np.array(predict_data[i]).reshape(-1,1)        
+            predict_data[i] = encoder.inverse_transform(dato)
+            
+            bar.next()
+            
+        bar.finish()
+        
+        #generar la tabla de prediciones
 
-# creando una tabla en la base de datos
-table_name = "predicciones"
-variable_name = ["predición","fecha","equipos_idequipos"]
-types = ["VARCHAR (255)", "DATE","INT"]
+        new_table = []
 
-exists = Admin.create_table(table_name, variable_name, types)  
-if(exists):
-    Admin.add_foreigh_key("equipos",table_name)
+        for i in col_names:
+            for j in range(len(self.sub_data[i])):
+                
+                new_table.append((predict_data[i][j][0],self.data2["new_date"],int(self.sub_data[i]["id"].to_numpy()[j])))
+                
+        table_name = "predicciones"
+        variable_name = ["predición","fecha","equipos_idequipos"]
+        types = ["VARCHAR (255)", "DATE","INT"]
 
-"insertando o actualizando los datos en la tabla"
+        exists = self.Admin.create_table(table_name, variable_name, types)  
+        
+        if exists: self.Admin.add_foreigh_key("equipos",table_name)
 
-for i in new_table:
+        "insertando o actualizando los datos en la tabla"
+        
+        bar2 = Bar('update information: ', max = len(new_table))
+        for i in new_table:
+            
+            # este vector es para tomar la decision entre insertar la informacion o actualizarla    
+            self.Admin.add_info(table_name,variable_name,i,exists)
+            bar2.next()
+        
+        bar2.finish()
     
-    # este vector es para tomar la decision entre insertar la informacion o actualizarla    
-    Admin.add_info(table_name,variable_name,i,exists)
-#%%
+    def get_matrix(self, result, num, training):
+        # carga la informacion
+        
+        if training: 
+            # variables donde se encontrara el encoder
+            self.enc_X = {}
+            self.enc_y = {}
+        
+        # los valores que se les realiazar el encoder
+        self.enc_X_data = {}
+        self.enc_y_data = {}
+        
+        self.days_data = {}
+        
+        obj_org = organizer(result,self.columns)
+        sort_data = obj_org.sort()
+
+        #subdivimos la muestra
+        obj_sub = subdivider(sort_data, sort_data["categoria"])
+        self.sub_data = obj_sub.Subdivide(num)
+        
+        self.out = sort_data
+        
+        #columna a realizar encoder 
+        columns_names = self.sub_data.keys()
+                
+        for j,i in enumerate(columns_names):
+                        
+            #objeto tiempo
+            obj_time = DateTime(self.sub_data[i])
+            self.days_data[i] = obj_time.datetime2days()
+
+            #objeto de encoder
+            obj_enc = Encoder(self.days_data[i])
+            
+            # si se esta llevando a cabo el entrenamiento
+            if training:
+                
+                self.enc_X[i] = obj_enc.encoder_X(self.names)
+                self.enc_y[i] = obj_enc.encoder_y()
+            
+            aux = self.enc_y[i].transform(np.array(self.days_data[i]["observaciones"]).reshape(-1,1)) 
+            self.enc_y_data[i] = pd.DataFrame(aux,columns = ["label"])
+            
+            
+            dic = {}
+            dic["id"] = self.days_data[i]["id"]
+            
+            for i_names in self.names:
+                    
+                dic[i_names] = self.enc_X[i][i_names].transform(np.array(self.days_data[i][i_names]).reshape(-1,1))
+                dic[i_names] = dic[i_names].ravel()
+                
+            dic["tiempo"] = self.days_data[i]["tiempo"]    
+            
+            self.enc_X_data[i] = pd.DataFrame(dic)
+            
+            l = len(self.enc_X_data[i])
+            rango = list(range(l))
+            index = pd.Index(rango)
+            
+            
+            self.enc_X_data[i] = self.enc_X_data[i].set_index([index])            
+        
+    def predict_few(self):
+        
+        word = "equi.idequipos = {}"
+        self.my_query += " AND ("
+        
+        for i in self.data2["id"]:
+            
+            word = " equi.idequipos = {} OR".format(i)
+            self.my_query +=  word
+        
+        self.my_query = self.my_query[:len(self.my_query) - 2]
+        self.my_query += " )"
+        
+        result = self.Admin.query(self.my_query)
+        
+        self.get_matrix(result,num = 1, training = False)
+        
+        self.out = self.enc_X_data
+        
+        self.predict_and_go()
+    
+    def r(self):
+        return self.out
+
+if __name__ == "__main__":
+    obj = my_main()
 
