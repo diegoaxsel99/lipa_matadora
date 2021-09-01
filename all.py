@@ -476,10 +476,10 @@ class my_main():
     
     def __init__(self):
         
-        f1 = open("input.json")
+        f1 = open("Json/input.json")
         self.data1 = json.load(f1)
         
-        f2 = open("predict.json")
+        f2 = open("Json/predict.json")
         self.data2 = json.load(f2)
         
         # consulta que se realiza
@@ -711,4 +711,4 @@ class my_main():
 
 if __name__ == "__main__":
     obj = my_main()
-
+    
