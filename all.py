@@ -15,6 +15,7 @@ import json # importar archivos json
 from progress.bar import Bar #animacion de barra de carga
 import numpy as np # manejo de herramientas matematicas y control de arrays
 from datetime import datetime
+import os
 
 # librerias propias
 from Lib.sql_operations import admin
@@ -219,6 +220,7 @@ class my_main():
         
         f2 = open("Json/predict.json")
         self.data2 = json.load(f2)
+        self.data2["update"] = datetime.now()
         
         #cursor que realizara las operaciones diferentes a las consultas con salida de tabla
         self.c = cursor
@@ -227,39 +229,7 @@ class my_main():
         self.db = connection
         
         # consulta que se realiza
-        self.my_query = """SELECT 
-
-        equi.idequipos,
-        modelo.modelo,
-        areas.area,
-        marca.marca,
-        sede.nombre_sede,
-        cat_equi.categoria,
-        equi.fecha_registro, 
-        mp.fecha_mant, 
-        mp.observaciones
-
-        FROM 
-        equipos AS equi, 
-        mant_prevent AS mp,
-        modelo,
-        areas_servicios AS areas,
-        categoria_equipos AS cat_equi,
-        sede_empresa AS sede,
-        marca
-
-        WHERE 
-        equi.idequipos = mp.equipos_idequipos 
-        AND 
-        equi.modelo_idmodelo = modelo.idmodelo
-        AND
-        equi.areas_servicios_idareas_servicios = areas.idareas_servicios
-        AND
-        equi.categoria_equipos_idcategoria_equipos = cat_equi.idcategoria_equipos
-        AND
-        equi.sede_empresa_idsede_empresa = sede.idsede_empresa
-        AND
-        modelo.marca_idmarca = marca.idmarca"""
+        self.my_query = open(os.path.join('query','query.txt'),'r').read()
                 
         self.columns = ["id",
                         "modelo",
@@ -351,11 +321,14 @@ class my_main():
         for i in col_names:
             for j in range(len(self.sub_data[i])):
                 
-                new_table.append((predict_data[i][j][0],self.data2["new_date"],int(self.sub_data[i]["idequipos"].to_numpy()[j])))
+                new_table.append((predict_data[i][j][0],
+                                  self.data2["new_date"],
+                                  self.data2["update"],
+                                  int(self.sub_data[i]["idequipos"].to_numpy()[j])))
                 
         table_name = "predicciones"
-        variable_name = ["predición","fecha","equipos_idequipos"]
-        types = ["VARCHAR (255)", "DATE","INT"]
+        variable_name = ["predición","fecha_p","fecha_a","equipos_idequipos"]
+        types = ["VARCHAR (255)", "DATE","DATE","INT"]
 
         exists = self.Admin.create_table(table_name, variable_name, types)  
         
@@ -364,7 +337,13 @@ class my_main():
             self.Admin.add_foreigh_key("equipos",table_name)
             
             for i in new_table:
-                self.Admin.add_info(table_name,variable_name,i,exists)
+                
+                self.Admin.add_info(table_name,
+                                    variable_name,
+                                    i,
+                                    exists,
+                                    types,
+                                    check_pos = 0)
         
         else:
             
@@ -378,18 +357,22 @@ class my_main():
                         
             for i in new_table:
                 
-                if i[2] in id_table:
+                if i[3] in id_table:
                     exists = False
                 else:
                     exists = True
-                
+            
                 # este vector es para tomar la decision entre insertar la informacion o actualizarla    
-                self.Admin.add_info(table_name,variable_name,i,exists)
+                self.Admin.add_info(table_name,
+                                    variable_name,
+                                    i,
+                                    exists,
+                                    types,
+                                    check_pos = 3)
                 bar2.next()
         
             bar2.finish()
 
-        self.out = id_table,new_table
         "insertando o actualizando los datos en la tabla"
 
     def get_matrix(self, result, num, training):
@@ -481,34 +464,41 @@ class my_main():
     def r(self):
         return self.out
 
-if __name__ == "__main__":
+def open_shh(ssh,database):
     
-    ssh_host =     '107.180.51.23'
-    ssh_username = 'zda7zbr6kwzz'
-    ssh_password = 'Agosto1994.'
-    
-    # database information
-    
-    database_username = 'axel_garcia'
-    database_password = '4x3lg4rc14'
-    database_name =     'axel_test'
-    localhost =         '127.0.0.1'
-    
-    # link progress
-    
-    tunel = conect.open_ssh_tunnel(ssh_host,
-                                   ssh_username,
-                                   ssh_password,
+        
+    tunel = conect.open_ssh_tunnel(ssh['host'],
+                                   ssh['user'],
+                                   ssh['passwd'],
                                    verbose = False)
     
-    connection = conect.mysql_connect(database_username,
-                                      database_password,
-                                      database_name,
+    connection = conect.mysql_connect(database['user'],
+                                      database['passwd'],
+                                      database['name'],
                                       tunel)
     
     cursor = connection.cursor()
     
+    return cursor, connection
+
+if __name__ == "__main__":
+    
+    ssh = {}
+    database = {}
+    
+    ssh['host'] =     '107.180.51.23'
+    ssh['user'] =     'zda7zbr6kwzz'
+    ssh['passwd'] =   'Agosto1994.'
+    
+    # database information
+    
+    database['user'] =   'axel_garcia'
+    database['passwd'] = '4x3lg4rc14'
+    database['name'] =   'axel_test'
+    localhost =          '127.0.0.1'
+    
+    # link progress
+    
+    cursor, connection = open_shh(ssh,database)
+    
     obj = my_main(cursor,connection)
-    
-    #obj = my_main(connection)
-    

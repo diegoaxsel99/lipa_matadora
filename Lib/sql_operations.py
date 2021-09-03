@@ -151,7 +151,7 @@ class admin():
         return self.c.rowcount
     
     
-    def add_info(self,table_name,columns_name,vals,value):
+    def add_info(self,table_name,columns_name,vals,value,types,check_pos):
         """[agrega informacion dentro de la tabla]
 
         Args:
@@ -178,13 +178,20 @@ class admin():
             
             query += f + " VALUES " + s
             
-            val = (vals[0],vals[1],int(vals[2]))
+            val = ()
+            for i,j in zip(vals,types):
+                
+                if j != "INT":
+                    val += (i,)
+                else:
+                    val += (int(i),)
+        
             self.c.execute(query,val)
             
             self.db.commit()
             
         else:
-            check_info = [columns_name[2],vals[2]]
+            check_info = [columns_name[check_pos],vals[check_pos]]
             
             for col,val in zip(columns_name,vals):
                 
