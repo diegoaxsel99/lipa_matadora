@@ -7,6 +7,7 @@ algoritmo unifcador de todo lo que se hizo
 @author: Matador
 """
 #%% librerias de python
+import mysql.connector as sql # conectar a base de datos
 import pandas as pd # manejo de dataframes
 from sklearn.preprocessing import OrdinalEncoder# hacer encoder sobre las variables string
 from sklearn.model_selection import train_test_split # para partir las variables
@@ -15,7 +16,6 @@ import json # importar archivos json
 from progress.bar import Bar #animacion de barra de carga
 import numpy as np # manejo de herramientas matematicas y control de arrays
 from datetime import datetime
-import os
 
 # librerias propias
 from Lib.sql_operations import admin
@@ -229,7 +229,39 @@ class my_main():
         self.db = connection
         
         # consulta que se realiza
-        self.my_query = open(os.path.join('query','query.txt'),'r').read()
+        self.my_query = """SELECT 
+
+        equi.idequipos,
+        modelo.modelo,
+        areas.area,
+        marca.marca,
+        sede.nombre_sede,
+        cat_equi.categoria,
+        equi.fecha_registro, 
+        mp.fecha_mant, 
+        mp.observaciones
+
+        FROM 
+        equipos AS equi, 
+        mant_prevent AS mp,
+        modelo,
+        areas_servicios AS areas,
+        categoria_equipos AS cat_equi,
+        sede_empresa AS sede,
+        marca
+
+        WHERE 
+        equi.idequipos = mp.equipos_idequipos 
+        AND 
+        equi.modelo_idmodelo = modelo.idmodelo
+        AND
+        equi.areas_servicios_idareas_servicios = areas.idareas_servicios
+        AND
+        equi.categoria_equipos_idcategoria_equipos = cat_equi.idcategoria_equipos
+        AND
+        equi.sede_empresa_idsede_empresa = sede.idsede_empresa
+        AND
+        modelo.marca_idmarca = marca.idmarca"""
                 
         self.columns = ["id",
                         "modelo",
@@ -437,9 +469,7 @@ class my_main():
             rango = list(range(l))
             index = pd.Index(rango)
             
-            self.enc_X_data[i] = self.enc_X_data[i].set_index([index])   
-            
-        self.out = self.enc_X_data
+            self.enc_X_data[i] = self.enc_X_data[i].set_index([index])            
         
     def predict_few(self):
         """[predice los id indicados en predict.json]
@@ -483,21 +513,6 @@ def open_shh(ssh,database):
     
     return cursor, connection
 
-def export_csv(query_path):
-    
-    query = open(query_path,'r').read()
-    data = conect.run_query(query,connection)
-    
-    save_path = query_path[:-4] + '.csv'
-    data.to_csv(save_path) 
-    
-def export_json(query_path,name):
-    
-    query = open(query_path,'r').read()
-    data = conect.run_query(query,connection)
-    
-    data.to_json(name + '.json', orient='records', lines=True)
-    
 if __name__ == "__main__":
     
     ssh = {}
@@ -517,12 +532,5 @@ if __name__ == "__main__":
     # link progress
     
     cursor, connection = open_shh(ssh,database)
-    #  ejecuta el codigo completo   
     
     obj = my_main(cursor,connection)
-
-
-    
-    
-    
-    

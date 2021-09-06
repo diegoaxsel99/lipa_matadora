@@ -1,0 +1,33 @@
+SELECT 
+
+equi.idequipos,
+modelo.modelo,
+areas.area,
+marca.marca,
+sede.nombre_sede,
+cat_equi.categoria,
+equi.fecha_registro, 
+mp.fecha_mant, 
+mp.observaciones
+
+FROM 
+equipos AS equi, 
+mant_prevent AS mp,
+modelo,
+areas_servicios AS areas,
+categoria_equipos AS cat_equi,
+sede_empresa AS sede,
+marca
+
+WHERE 
+equi.idequipos = mp.equipos_idequipos 
+AND 
+equi.modelo_idmodelo = modelo.idmodelo
+AND
+equi.areas_servicios_idareas_servicios = areas.idareas_servicios
+AND
+equi.categoria_equipos_idcategoria_equipos = cat_equi.idcategoria_equipos
+AND
+equi.sede_empresa_idsede_empresa = sede.idsede_empresa
+AND
+modelo.marca_idmarca = marca.idmarca
